@@ -1,0 +1,281 @@
+---
+title: 'Assignment 2: Analysis of Customer Sentiment Index'
+author: "Neha Awasthi, Sukeerthi Adi, Vaishnavi Vankamamidi, Linda Ochieng"
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction to the Index of Consumer Sentiment 
+
+The Michigan Consumer Sentiment Index is a major economic indicator that can help investors and economists predict: 
+
+1. The strength of the current US Economy
+
+2. Where the economy is headed
+
+3. The average US consumer’s confidence level.
+
+This information is useful to retailers, investors, and economists to analyze the rise and fall of this data to predict economic expansions and contractions. 
+
+## Brief History 
+
+The Michigan Consumer Sentiment Index was created in the 1940s by Professor George Katona at the University of Michigan's Institute for Social Research. His efforts ultimately led to a national telephone survey conducted and published monthly by the university.
+
+The survey is currently conducted by the Survey Research Center and consists of at least 500 telephone interviews posed to a different cross-section of consumers in the continental U.S. each month.
+
+## Compilation
+The survey questions consumers on:
+
+1. Current business conditions
+
+2. Business conditions for the next six months
+
+3. Current employment conditions
+
+4. Employment conditions for the next six months
+
+5. Total family income for the next six months
+
+Each survey contains approximately 50 core questions, and each respondent is contacted again for another survey six months after completing the first one. The answers to these questions form the basis of the index.
+
+About 60% of each monthly survey consists of new responses, and the remaining 40% is drawn from repeat surveys. The repeat surveys help reveal the changes in consumer sentiment over time and provide a more accurate measure of consumer confidence. The survey also attempts to accurately incorporate consumer expectations into behavioral spending and saving models in an empirical fashion.
+
+## Scope of Analysis
+
+In this analysis, we will be exploring the basic Index of Customer Sentiment per month from 2008 to 2022. 
+
+1. UMCSI values greater than 80 show strong consumer sentiment. These reading have historically coincided with strong US GDP growth higher than 3%. 
+
+2. UMCSI values between 70 and 80 show normal sentiment. These readings have historically coincided with US GDP growth between 0-2%. 
+
+3. UMCSI values between 50 and 70 show extremely bearish consumer sentiment. These reading have historically coincided with US economic recessions with US GDP growth between -3% and 0%.
+
+## 1. Recent Trend in the Customer Satisfaction Index
+
+We start by importing the necessary libraries and the datasets
+```{r, message=FALSE, warning=FALSE}
+library(stringr)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(reshape2)
+library(readxl)
+library(plotly)
+library(ggcorrplot)
+library(patchwork)
+library(readr)
+
+CustIndex <- read_csv("~/Desktop/FINC/Assignment2/sca-table1-on-2022-Nov-11.csv")
+head(CustIndex)
+```
+
+To find the recent trends in the index, we use visual plots to identify the relationship between the Customer Sentiment Index and year and more specifically, the changes taking place over the years. 
+
+```{r, message=FALSE, warning=FALSE}
+CustIndex[c('Month', 'Year', 'Index')] <- str_split_fixed(CustIndex$`Table 1: The Index of Consumer Sentiment`, ',',3) # Split data into three appropriately named columns
+df <- CustIndex[-1] # drop redundant column
+df<-df[-c(1), ]  # drop redundant row
+df$Index <- gsub(",$", "", df$Index) # clean up data
+df$Index <- as.numeric(df$Index) #convert strings to numeric
+df$Year <- as.Date(as.character(df$Year), format = "%Y") # convert string and extract year
+df$Year<- year(df$Year)
+head(df)
+```
+
+Let's group by Year and get the average of index.
+
+```{r, message=FALSE, warning=FALSE}
+df1<- df %>% group_by(Year) %>% summarise(Avg_Index = mean(Index, na.rm = TRUE)) #group by year and take avg
+head(df1)
+```
+
+Let's plot the average of index against the years
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(df1, aes(x= Year, y= Avg_Index)) +
+  geom_line()
+```
+
+### Observations
+
+1. The years 2008 to 2011 showed a low CSI, probably due to the bursting of the U.S. housing bubble and the global financial crisis - The Great Recession. 
+
+2. The CSI then seems to recover and gain strength over the next few years and reached its peak in 2017.
+
+3. Further down the lane, we see another drop in 2020, possibly due to the pandemic, which evidently shook businesses worldwide.
+
+4. However, it’s interesting to see that it dropped again in 2022, very similar to 2008. As much as it looks like we’re in the middle of a similar recession, it’s not the case. Though the economy has occasionally sputtered in 2022, it has certainly been resilient — and according to a traditional definition, the U.S. is not currently in a recession.
+
+## 2. Components of the Index of Consumer Sentiment
+
+The Components of the Index of Consumer Sentiment consist of data related to: Current and Expected Indexes of Personal Finances, 12 months and 5-year-based Indexes of Business Conditions, Buying Conditions, Overall Current Index & Overall Expected Index.
+
+### Scope of Analysis
+
+In this analysis, we analyze various components of the Index of Consumer Sentiment and perform a correlation analysis to see which component directly affects the overall Index strongly. 
+
+Furthermore, it identified which category (personal finance, business conditions, etc) is the most impactful by the data received from the customers. 
+
+```{r, message=FALSE, warning=FALSE}
+# read the dataset
+Table_5 <- read_excel("~/Desktop/FINC/Assignment2/Table_5.xlsx") 
+head(Table_5)
+```
+Convert the whole dataset into numeric using as.numeric , and the year and month column into character using as.character, so that we get an appropriate and apt summary of the dataset, and correlation.
+
+```{r, message=FALSE, warning=FALSE}
+tb5_1 <- Table_5 
+tb5_1 = rename(tb5_1, "Month" = "Table 5: Components of the Index of Consumer Sentiment","Year" = '...2',"PerFinCurr" = '...3',"PerFinExp" = '...4',"BusiCon_12M" = '...5',"BusiCon_5Y" = '...6',
+               "BuyCon" = '...7', "CurInd" = '...8',"ExpInd" = '...9') 
+tb5_1 <- as.data.frame(tb5_1[-1,]) # removed the first row and stored it as data frame
+tb5_1 = as.data.frame(lapply(tb5_1,as.numeric)) # converted every row to numeric values 
+tb5_1$Month <- as.character(tb5_1$Month) #converted Month column to character
+tb5_1$Year <- as.character(tb5_1$Year) #converted Year column to character
+summary(tb5_1) #summarising the dataset
+```
+Calculate and visualize correlation between all numerical variables
+
+```{r, message=FALSE, warning=FALSE}
+cor_tb5_1 <- round(cor(tb5_1[,c(-1,-2)]),2) #taking correlation between all columns 
+corrmat <-ggcorrplot(cor_tb5_1, hc.order = TRUE, type = "lower", lab = TRUE) 
+ggplotly(corrmat) #plotting the correlation plot
+```
+
+Plot Expected index with Business conditions
+```{r, message=FALSE, warning=FALSE}
+tb5_1 = as.data.frame(lapply(tb5_1,as.numeric)) #converting all columns into numeric
+g <- ggplot(data=tb5_1, aes(ExpInd, BusiCon_5Y, fill=Year))+
+  geom_point(pch=I(21))+
+  scale_fill_continuous(low='red', high='blue') + 
+  geom_smooth(method=lm) # plotting Expected Index vs Business Condition in 5 Years
+fig1 <- ggplotly(g)
+g2 <- ggplot(data=tb5_1, aes(ExpInd, BusiCon_12M, fill=Year))+
+  geom_point(pch=I(21))+
+  scale_fill_continuous(low='red', high='blue') + 
+  geom_smooth(method=lm) # plotting Expected Index vs Business Condition in 12 Months
+fig2 <- ggplotly(g2) 
+subplot(fig1, fig2, titleY = TRUE, titleX = TRUE)
+```
+
+### Observations:
+
+The correlation between Components of the Index of Consumer Sentiment indicates that business conditions of 12 months and 5 years are highly correlated compared to other components. (0.97 and 0.96 respectively).
+The graph shows a strong linear relationship between the expected index versus business conditions for 12 months and business conditions for 5 years.
+
+## 3. Trend in Past and Expected Changes in Business Conditions
+
+Since Business Conditions showed a high correlation with the target variable, i.e. Customer Index, we dive a little deeper into the analysis between the state of Business Conditions and how it affects the overall index over time. 
+
+This data was acquired by asking consumers two main questions: 
+
+1. Would you say that at the present time business conditions are better or worse than they were a year ago?
+
+2. And how about a year from now, do you expect that business conditions in the country as a whole will be better, or worse than they are at present, or just about the same?
+
+The data consists of the change in the degree of responses to the above questions- Intermittent Increase, Remain Unchanged, Intermittent Decline, Continuous Decline, and Mixed Change.
+
+```{r, message=FALSE, warning=FALSE}
+Table_27 <- read_excel("~/Desktop/FINC/Assignment2/Table_27.xlsx")
+Bus_Con <- Table_27 
+Bus_Con = rename(Table_27, "Month" = "Table 27: Trend in Past and Expected Changes in Business Conditions","Year" = '...2',"Continuous_Increase" = '...3', "Intermittent_Increase"= '...4',"Remain_Unchanged" = '...5',"Intermittent_Decline" = '...6', "Continuous_Decline" = '...7', "Mixed_Change" = '...8',"DK/NA" = '...9', "Relative" = '...10' )
+Bus_Con<-Bus_Con[-c(1), ] 
+head(Bus_Con)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Check the data types to make any changes if needed
+str(Bus_Con)
+```
+
+Change the variables to numeric type and year as a date-type object
+```{r, message=FALSE, warning=FALSE}
+# Convert all the variables to numeric types
+Bus_Con$`Continuous_Increase` <- as.numeric(Bus_Con$`Continuous_Increase`)
+Bus_Con$`Intermittent_Increase` <- as.numeric(Bus_Con$`Intermittent_Increase`)
+Bus_Con$`Remain_Unchanged` <- as.numeric(Bus_Con$`Remain_Unchanged`)
+Bus_Con$`Intermittent_Decline` <- as.numeric(Bus_Con$`Intermittent_Decline`)
+Bus_Con$`Mixed_Change` <- as.numeric(Bus_Con$`Mixed_Change`)
+Bus_Con$`Continuous_Decline` <- as.numeric(Bus_Con$`Continuous_Decline`)
+Bus_Con$Year <- as.Date(as.character(Bus_Con$Year), format = "%Y")  
+Bus_Con$Year<- year(Bus_Con$Year) # convert string to date-type and extract year
+head(Bus_Con)
+```
+Let's group by Year and create a datframe with the averages of all components
+
+```{r, message=FALSE, warning=FALSE}
+Bus_Con_Y<- Bus_Con %>% group_by(Year) %>% summarise(Avg_ContInc=mean(`Continuous_Increase`,na.rm =T),
+                                                  Avg_IntrmInc=mean(`Intermittent_Increase`,na.rm = T),
+                                                  Avg_RemnUnch= mean(Remain_Unchanged, na.rm =T),
+                                                  Avg_IntermDec= mean(Intermittent_Decline, na.rm = T),
+                                                  Avg_ContDec= mean(Continuous_Decline, na.rm = T),
+                                                  Avg_MixedCh= mean(Mixed_Change, na.rm = T)) 
+head(Bus_Con_Y)
+```
+
+Let's visualize the trends in components of business conditions over the years
+
+```{r, message=FALSE, warning=FALSE}
+# Convert the dataframe from long to wide-form to plot all the trends simultaneously
+Bus_Con_L = melt(Bus_Con_Y, id.vars=c("Year"))
+head(Bus_Con_L)
+
+# time-series plot for the trends in Business conditions over the years
+ggplot(Bus_Con_L, aes(Year, value, color= variable)) +
+  geom_line() +
+  labs(x= "Year", y = "Average Index")
+```
+
+For a clearer understanding of various trends over time, let's plot the different components separately
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Bus_Con_L, aes(Year, value)) +
+  geom_line() +
+  labs(x= "Year", y = "Average Index")+
+  facet_wrap(vars(variable))
+```
+
+### Observations
+
+After plotting the Average Index against each of the survey responses by Year, we observe the following trends in Customer Sentiment:
+
+1. Very few people believed that there would be no change in Business Conditions moving forward into the future.
+
+2. Intermittent Increase was predicted heavily right after the great recession of 2008. It proceeded to increase till 2015. Furthermore, there was a sharp decrease in that belief when the pandemic hit. 
+
+3. Belief that Intermittent Decreases would take place dropped right after the 2008 recession as people gained confidence that the economy would get back on to its feet. With slight changes post-2012, there was an increase in the belief that the conditions would worsen post-2020. 
+
+4. Very similar trends can be observed with Continous Increases and Continous Decreases. Overall, the recession in 2008, the pandemic and the predicted recession in 2022 are the main tipping points of the index.
+
+## Use Cases of the Consumer Sentiment Index
+
+### Previous Use Cases of the Consumer Sentiment Index
+Since its establishment, the Michigan CSI has expanded to become one of the most widely used consumer sentiment indicators in the United States. 
+
+1. The rise and fall of this indicator have historically helped retailers, economists, and investors predict economic expansions and contractions. 
+
+2. Consumer confidence typically drops before and during economic downturns. Higher optimism about the economy manifests in higher consumer spending, which spurs quicker economic growth.This information can be leveraged by companies to formulate strategies.
+
+3. Increasing demand from overseas buyers drives up the dollar's value against other currencies. When the Michigan CSI has exceeded expectations, the dollar's value has risen, but when it has plunged, the value of the dollar has fallen.
+
+### Recommended/Potential Use Cases
+There are several different ways that corporations can use the Index of Consumer Sentiment to inform their decision-making. 
+
+1. The index can be used to track changes in consumer confidence over time, which can help forecast future spending patterns. 
+
+2. Businesses can also use the index to assess consumer confidence levels across different regions or demographics. This information can help target marketing and sales efforts in areas where consumer confidence is high.
+
+3. Corporate policymakers also closely watch the Index of Consumer Sentiment as it can provide insights into the economy's health. 
+
+4. The index can also be used to assess the impact of economic policies on consumer confidence. For example, a sharp decline in consumer confidence can signify that an economic recession may be on the horizon.
+
+## Conclusion and Future Analysis
+
+The Michigan Consumer Sentiment Index has always provided a relatively accurate forecast of future consumer confidence and spending for the past several decades. Investors can use the index for their benefit in several ways. 
+
+When consumer confidence increases, certain sectors tend to benefit sooner than others. Companies that provide consumer goods often reap the initial fruits of improved consumer sentiment. Consumers who feel more confident about the economy generally also feel better about their employment prospects and are therefore more willing to buy houses, cars, appliances, and other items. Investors should look at the stocks of car manufacturers, home builders, and other retailers that typically see sales rise when the economy begins an expansion period.
+
+
+  
